@@ -6,7 +6,7 @@ final class Billing
 {
     public static function findById(int $billingId): ?array
     {
-        $stmt = db()->prepare("SELECT * FROM billing WHERE billing_id = :bid LIMIT 1");
+        $stmt = Database::getInstance()->prepare("SELECT * FROM billing WHERE billing_id = :bid LIMIT 1");
         $stmt->execute([':bid' => $billingId]);
         $row = $stmt->fetch();
         return $row ?: null;
@@ -14,7 +14,7 @@ final class Billing
 
     public static function listByPatient(int $patientId, int $limit = 50): array
     {
-        $stmt = db()->prepare("SELECT * FROM billing
+        $stmt = Database::getInstance()->prepare("SELECT * FROM billing
                            WHERE patient_id = :pid
                            ORDER BY created_at DESC
                            LIMIT " . (int) $limit);
@@ -33,7 +33,7 @@ final class Billing
               (patient_id, total_amount, status, due_date, billed_at, description)
               VALUES
               (:pid, :amt, :status, :due, :billed, :desc)";
-        $stmt = db()->prepare($sql);
+        $stmt = Database::getInstance()->prepare($sql);
         $stmt->execute([
             ':pid' => $patientId,
             ':amt' => $totalAmount,
@@ -42,6 +42,6 @@ final class Billing
             ':billed' => $billedAt ?: date('Y-m-d H:i:s'),
             ':desc' => $description,
         ]);
-        return (int) db()->lastInsertId();
+        return (int) Database::getInstance()->lastInsertId();
     }
 }

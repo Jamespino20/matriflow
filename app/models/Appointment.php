@@ -17,19 +17,19 @@ final class Appointment
       (patient_id, doctor_user_id, appointment_purpose, appointment_status, appointment_date)
       VALUES
       (:pid, :duid, :purpose, 'scheduled', :dt)";
-        $stmt = db()->prepare($sql);
+        $stmt = Database::getInstance()->prepare($sql);
         $stmt->execute([
             ':pid' => $patientId,
             ':duid' => $doctorUserId,
             ':purpose' => $purpose,
             ':dt' => $dateTime,
         ]);
-        return (int) db()->lastInsertId();
+        return (int) Database::getInstance()->lastInsertId();
     }
 
     public static function listByPatient(int $patientId, int $limit = 50): array
     {
-        $stmt = db()->prepare("SELECT * FROM appointment
+        $stmt = Database::getInstance()->prepare("SELECT * FROM appointment
                            WHERE patient_id = :pid AND deleted_at IS NULL
                            ORDER BY appointment_date DESC
                            LIMIT " . (int) $limit);

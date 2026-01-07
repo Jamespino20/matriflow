@@ -106,7 +106,7 @@ final class FileService
 
         $relativePath = '/public/assets/uploads/documents/' . date('Y/m') . '/' . $uniqueName;
 
-        $stmt = db()->prepare("INSERT INTO documents (uploader_user_id, patient_id, file_name, file_path, file_type, file_size, category, description) 
+        $stmt = Database::getInstance()->prepare("INSERT INTO documents (uploader_user_id, patient_id, file_name, file_path, file_type, file_size, category, description)
                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $uploaderId,
@@ -119,7 +119,7 @@ final class FileService
             $description
         ]);
 
-        $id = db()->lastInsertId();
+        $id = Database::getInstance()->lastInsertId();
 
         AuditLogger::log($uploaderId, 'documents', 'INSERT', (int)$id, 'document_uploaded: ' . $file['name']);
 

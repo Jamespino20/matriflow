@@ -8,7 +8,7 @@ final class AuditLogger
         try {
             $sql = "INSERT INTO audit_log (user_id, table_name, operation, record_id, changes_made, ip_address)
               VALUES (:user_id, :table_name, :operation, :record_id, :changes_made, :ip)";
-            $stmt = db()->prepare($sql);
+            $stmt = Database::getInstance()->prepare($sql);
             $stmt->execute([
                 ':user_id' => $userId,
                 ':table_name' => $table,

@@ -26,7 +26,7 @@ final class QueueController
 
         $sql .= " ORDER BY q.position ASC";
 
-        $stmt = db()->prepare($sql);
+        $stmt = Database::getInstance()->prepare($sql);
         if ($doctorId > 0) {
             $stmt->execute([':did' => $doctorId]);
         } else {
@@ -40,7 +40,7 @@ final class QueueController
      */
     public static function checkIn(int $appointmentId): bool
     {
-        $db = db();
+        $db = Database::getInstance();
         try {
             $db->beginTransaction();
 
@@ -71,7 +71,7 @@ final class QueueController
      */
     public static function updateStatus(int $queueId, string $status): bool
     {
-        $db = db();
+        $db = Database::getInstance();
         $params = [':id' => $queueId, ':status' => $status];
         $timeCol = '';
 

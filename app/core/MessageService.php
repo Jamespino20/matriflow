@@ -9,9 +9,9 @@ final class MessageService
      */
     public static function sendMessage(int $senderId, int $receiverId, string $body): int
     {
-        $stmt = db()->prepare("INSERT INTO messages (sender_id, receiver_id, message_body, created_at) VALUES (?, ?, ?, NOW())");
+        $stmt = Database::getInstance()->prepare("INSERT INTO messages (sender_id, receiver_id, message_body, created_at) VALUES (?, ?, ?, NOW())");
         $stmt->execute([$senderId, $receiverId, $body]);
-        $msgId = (int) db()->lastInsertId();
+        $msgId = (int) Database::getInstance()->lastInsertId();
         AuditLogger::log($senderId, 'messages', 'INSERT', $msgId, "Message sent to User ID: $receiverId");
         return $msgId;
     }
@@ -21,7 +21,7 @@ final class MessageService
      */
     public static function getConversation(int $userA, int $userB, int $limit = 50): array
     {
-        $stmt = db()->prepare("
+        $stmt = Database::getInstance()->prepare("
             SELECT * FROM messages 
             WHERE (sender_id = :a1 AND receiver_id = :b1) OR (sender_id = :b2 AND receiver_id = :a2)
             ORDER BY created_at ASC 
@@ -41,7 +41,7 @@ final class MessageService
      */
     public static function getNewMessages(int $userA, int $userB, int $lastId): array
     {
-        $stmt = db()->prepare("
+        $stmt = Database::getInstance()->prepare("
             SELECT * FROM messages 
             WHERE ((sender_id = :a1 AND receiver_id = :b1) OR (sender_id = :b2 AND receiver_id = :a2))
             AND id > :last
@@ -56,7 +56,7 @@ final class MessageService
      */
     public static function getContacts(int $userId): array
     {
-        $stmt = db()->prepare("
+        $stmt = Database::getInstance()->prepare("
             SELECT DISTINCT u.user_id, u.first_name, u.last_name, u.role,
             (SELECT message_body FROM messages 
              WHERE (sender_id = u.user_id AND receiver_id = :uid1) OR (sender_id = :uid2 AND receiver_id = u.user_id)
@@ -86,7 +86,7 @@ final class MessageService
      */
     public static function markAsRead(int $receiverId, int $senderId): void
     {
-        $stmt = db()->prepare("UPDATE messages SET is_read = 1, read_at = NOW() WHERE receiver_id = :rid AND sender_id = :sid AND is_read = 0");
+        $stmt = Database::getInstance()->prepare("UPDATE messages SET is_read = 1, read_at = NOW() WHERE receiver_id = :rid AND sender_id = :sid AND is_read = 0");
         $stmt->execute([':rid' => $receiverId, ':sid' => $senderId]);
     }
 }

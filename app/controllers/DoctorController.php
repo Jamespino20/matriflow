@@ -9,7 +9,7 @@ final class DoctorController
         $today = date('Y-m-d');
 
         // Today's Appointments
-        $stmt = db()->prepare("SELECT COUNT(*) FROM appointment 
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM appointment
                                WHERE (doctor_user_id = :uid OR doctor_user_id IS NULL) 
                                AND DATE(appointment_date) = :today 
                                AND appointment_status = 'scheduled'");
@@ -17,13 +17,13 @@ final class DoctorController
         $todayPatients = (int) $stmt->fetchColumn();
 
         // Lab Results Waiting Review
-        $stmt = db()->prepare("SELECT COUNT(*) FROM laboratory_test 
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM laboratory_test
                                WHERE status = 'completed' AND doctor_reviewed = 0");
         $stmt->execute();
         $pendingLabs = (int) $stmt->fetchColumn();
 
         // Recent Appointments for the list (Today)
-        $stmt = db()->prepare("SELECT a.*, p.identification_number, u.first_name, u.last_name 
+        $stmt = Database::getInstance()->prepare("SELECT a.*, p.identification_number, u.first_name, u.last_name
                                FROM appointment a
                                JOIN patient p ON a.patient_id = p.patient_id
                                JOIN user u ON p.user_id = u.user_id
@@ -35,12 +35,12 @@ final class DoctorController
         $recentAppointments = $stmt->fetchAll() ?: [];
 
         // Unread Messages Count
-        $stmt = db()->prepare("SELECT COUNT(*) FROM messages WHERE receiver_id = :uid AND is_read = 0");
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM messages WHERE receiver_id = :uid AND is_read = 0");
         $stmt->execute([':uid' => $userId]);
         $unreadCount = (int)$stmt->fetchColumn();
 
         // Recent Activity - using appointments instead since consultation doesn't have doctor_user_id
-        $stmt = db()->prepare("SELECT 'appointment' as type, a.appointment_date as created_at, u.first_name, u.last_name 
+        $stmt = Database::getInstance()->prepare("SELECT 'appointment' as type, a.appointment_date as created_at, u.first_name, u.last_name
                                 FROM appointment a 
                                 JOIN patient p ON a.patient_id = p.patient_id 
                                 JOIN user u ON p.user_id = u.user_id 

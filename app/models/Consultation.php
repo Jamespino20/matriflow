@@ -6,7 +6,7 @@ final class Consultation
 {
     public static function create(int $patientId, int $doctorId, array $data): int
     {
-        $stmt = db()->prepare("INSERT INTO consultation 
+        $stmt = Database::getInstance()->prepare("INSERT INTO consultation
             (patient_id, doctor_user_id, appointment_id, consultation_type, subjective_notes, objective_notes, assessment, plan, created_at)
             VALUES (:pid, :did, :aid, :type, :s, :o, :a, :p, NOW())");
 
@@ -21,12 +21,12 @@ final class Consultation
             ':p' => $data['plan'] ?? null
         ]);
 
-        return (int) db()->lastInsertId();
+        return (int) Database::getInstance()->lastInsertId();
     }
 
     public static function listByPatient(int $patientId): array
     {
-        $stmt = db()->prepare("SELECT c.*, u.first_name as doctor_first, u.last_name as doctor_last 
+        $stmt = Database::getInstance()->prepare("SELECT c.*, u.first_name as doctor_first, u.last_name as doctor_last
                              FROM consultation c 
                              JOIN user u ON c.doctor_user_id = u.user_id 
                              WHERE c.patient_id = ? 

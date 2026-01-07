@@ -70,7 +70,7 @@ final class RegisterController
         }
 
         // Check Duplicates
-        $stmt = db()->prepare("SELECT COUNT(*) FROM user WHERE email = :email OR username = :username");
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM user WHERE email = :email OR username = :username");
         $chkUsername = $data['username'] ?: '---'; // avoid matching empty
         $stmt->execute([':email' => $data['email'], ':username' => $chkUsername]);
         if ($stmt->fetchColumn() > 0) {
@@ -92,9 +92,9 @@ final class RegisterController
 
         // 3. Insert User
         try {
-            db()->beginTransaction();
+            Database::getInstance()->beginTransaction();
 
-            $stmt = db()->prepare("
+            $stmt = Database::getInstance()->prepare("
                 INSERT INTO user (username, password_hash, first_name, last_name, role, email, contact_number, gender, registration_type, is_active, account_status, created_at)
                 VALUES (:u, :p, :f, :l, 'patient', :e, :c, :g, :rt, 1, 'pending', NOW())
             ");
@@ -110,16 +110,16 @@ final class RegisterController
                 ':rt' => $data['registration_type']
             ]);
 
-            $userId = (int) db()->lastInsertId();
+            $userId = (int) Database::getInstance()->lastInsertId();
 
             // 4. Create Patient Profile
-            $stmt = db()->prepare("INSERT INTO patient (user_id, dob, created_at) VALUES (:uid, :dob, NOW())");
+            $stmt = Database::getInstance()->prepare("INSERT INTO patient (user_id, dob, created_at) VALUES (:uid, :dob, NOW())");
             $stmt->execute([
                 ':uid' => $userId,
                 ':dob' => $data['dob']
             ]);
 
-            db()->commit();
+            Database::getInstance()->commit();
 
             AuditLogger::log($userId, 'user', 'INSERT', $userId, 'patient_registration');
             AuditLogger::log($userId, 'patient', 'INSERT', 0, 'patient_profile_created');

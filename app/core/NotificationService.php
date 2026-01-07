@@ -7,7 +7,7 @@ final class NotificationService
     public static function create(int $userId, string $title, string $message, string $type = 'info', ?string $url = null): bool
     {
         try {
-            $stmt = db()->prepare("INSERT INTO notifications (user_id, title, message, type, action_url) VALUES (?, ?, ?, ?, ?)");
+            $stmt = Database::getInstance()->prepare("INSERT INTO notifications (user_id, title, message, type, action_url) VALUES (?, ?, ?, ?, ?)");
             return $stmt->execute([$userId, $title, $message, $type, $url]);
         } catch (Throwable $e) {
             return false;

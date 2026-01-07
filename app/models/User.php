@@ -6,7 +6,7 @@ final class User
 {
     public static function findById(int $userId): ?array
     {
-        $stmt = db()->prepare("SELECT * FROM user WHERE user_id = :id LIMIT 1");
+        $stmt = Database::getInstance()->prepare("SELECT * FROM user WHERE user_id = :id LIMIT 1");
         $stmt->execute([':id' => $userId]);
         $row = $stmt->fetch();
         return $row ?: null;
@@ -14,7 +14,7 @@ final class User
 
     public static function findByIdentity(string $identity): ?array
     {
-        $stmt = db()->prepare("SELECT * FROM user WHERE username = :u OR email = :e LIMIT 1");
+        $stmt = Database::getInstance()->prepare("SELECT * FROM user WHERE username = :u OR email = :e LIMIT 1");
         $stmt->execute([':u' => $identity, ':e' => $identity]);
         $row = $stmt->fetch();
         return $row ?: null;
@@ -22,14 +22,14 @@ final class User
 
     public static function usernameExists(string $username): bool
     {
-        $stmt = db()->prepare("SELECT 1 FROM user WHERE username = :u LIMIT 1");
+        $stmt = Database::getInstance()->prepare("SELECT 1 FROM user WHERE username = :u LIMIT 1");
         $stmt->execute([':u' => $username]);
         return (bool) $stmt->fetchColumn();
     }
 
     public static function emailExists(string $email): bool
     {
-        $stmt = db()->prepare("SELECT 1 FROM user WHERE email = :e LIMIT 1");
+        $stmt = Database::getInstance()->prepare("SELECT 1 FROM user WHERE email = :e LIMIT 1");
         $stmt->execute([':e' => $email]);
         return (bool) $stmt->fetchColumn();
     }
@@ -41,7 +41,7 @@ final class User
        force_2fa_setup,is_2fa_enabled,failed_login_attempts)
       VALUES
       (:username,:phash,:first,:last,'patient',:email,:phone,1,1,0,0)";
-        $stmt = db()->prepare($sql);
+        $stmt = Database::getInstance()->prepare($sql);
         $stmt->execute([
             ':username' => $data['username'],
             ':phash' => $data['password_hash'],
@@ -50,7 +50,7 @@ final class User
             ':email' => $data['email'],
             ':phone' => $data['contact_number'],
         ]);
-        return (int) db()->lastInsertId();
+        return (int) Database::getInstance()->lastInsertId();
     }
 
     public static function create(array $data): int
@@ -60,7 +60,7 @@ final class User
        force_2fa_setup,is_2fa_enabled,failed_login_attempts)
       VALUES
       (:username,:phash,:first,:last,:role,:email,:phone,1,1,0,0)";
-        $stmt = db()->prepare($sql);
+        $stmt = Database::getInstance()->prepare($sql);
         $stmt->execute([
             ':username' => $data['username'],
             ':phash' => $data['password_hash'],
@@ -70,7 +70,7 @@ final class User
             ':email' => $data['email'],
             ':phone' => $data['contact_number'] ?? null,
         ]);
-        return (int) db()->lastInsertId();
+        return (int) Database::getInstance()->lastInsertId();
     }
 
     public static function update(int $userId, array $data): bool
@@ -83,28 +83,28 @@ final class User
         }
         if (empty($sets)) return false;
         $sql = "UPDATE user SET " . implode(', ', $sets) . " WHERE user_id = :id";
-        return db()->prepare($sql)->execute($params);
+        return Database::getInstance()->prepare($sql)->execute($params);
     }
 
     public static function deactivate(int $userId): bool
     {
-        return db()->prepare("UPDATE user SET is_active = 0 WHERE user_id = ?")->execute([$userId]);
+        return Database::getInstance()->prepare("UPDATE user SET is_active = 0 WHERE user_id = ?")->execute([$userId]);
     }
 
     public static function activate(int $userId): bool
     {
-        return db()->prepare("UPDATE user SET is_active = 1 WHERE user_id = ?")->execute([$userId]);
+        return Database::getInstance()->prepare("UPDATE user SET is_active = 1 WHERE user_id = ?")->execute([$userId]);
     }
 
     public static function setLastLogin(int $userId): void
     {
-        $stmt = db()->prepare("UPDATE user SET last_login_at = NOW(), failed_login_attempts = 0, account_locked_until = NULL WHERE user_id = :id");
+        $stmt = Database::getInstance()->prepare("UPDATE user SET last_login_at = NOW(), failed_login_attempts = 0, account_locked_until = NULL WHERE user_id = :id");
         $stmt->execute([':id' => $userId]);
     }
 
     public static function recordFailedLogin(int $userId): void
     {
-        $stmt = db()->prepare("UPDATE user SET failed_login_attempts = failed_login_attempts + 1 WHERE user_id = :id");
+        $stmt = Database::getInstance()->prepare("UPDATE user SET failed_login_attempts = failed_login_attempts + 1 WHERE user_id = :id");
         $stmt->execute([':id' => $userId]);
 
         $row = self::findById($userId);
@@ -112,7 +112,7 @@ final class User
             return;
 
         if ((int) $row['failed_login_attempts'] >= LOGIN_LOCK_AFTER) {
-            $stmt2 = db()->prepare("UPDATE user SET account_locked_until = DATE_ADD(NOW(), INTERVAL " . (int) LOGIN_LOCK_MINUTES . " MINUTE) WHERE user_id = :id");
+            $stmt2 = Database::getInstance()->prepare("UPDATE user SET account_locked_until = DATE_ADD(NOW(), INTERVAL " . (int) LOGIN_LOCK_MINUTES . " MINUTE) WHERE user_id = :id");
             $stmt2->execute([':id' => $userId]);
         }
     }
