@@ -25,7 +25,7 @@ final class ReminderService
                 AND a.reminder_sent = 0
                 AND a.appointment_status = 'scheduled'";
 
-        $stmt = db()->prepare($sql);
+        $stmt = Database::getInstance()->prepare($sql);
         $stmt->execute([':tomorrow' => $dateStr]);
         $appointments = $stmt->fetchAll();
 
@@ -39,7 +39,7 @@ final class ReminderService
             self::logReminder((int)$appt['appointment_id'], 'sms', $phone ?: 'N/A');
 
             // Mark as sent
-            $upd = db()->prepare("UPDATE appointment SET reminder_sent = 1 WHERE appointment_id = ?");
+            $upd = Database::getInstance()->prepare("UPDATE appointment SET reminder_sent = 1 WHERE appointment_id = ?");
             $upd->execute([$appt['appointment_id']]);
 
             $log[] = "Sent SMS to {$appt['first_name']} (ID: {$appt['appointment_id']})";
@@ -50,7 +50,7 @@ final class ReminderService
 
     private static function logReminder(int $apptId, string $type, string $recipient): void
     {
-        $stmt = db()->prepare("INSERT INTO reminder_logs (appointment_id, type, recipient, sent_at, status) VALUES (?, ?, ?, NOW(), 'sent')");
+        $stmt = Database::getInstance()->prepare("INSERT INTO reminder_logs (appointment_id, type, recipient, sent_at, status) VALUES (?, ?, ?, NOW(), 'sent')");
         $stmt->execute([$apptId, $type, $recipient]);
     }
 }

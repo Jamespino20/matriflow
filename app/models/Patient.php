@@ -8,28 +8,28 @@ final class Patient
         // Try with dob column first, if it fails, try without it
         try {
             $sql = "INSERT INTO patient (user_id, dob, age_at_registration) VALUES (:uid, :dob, :age)";
-            $stmt = db()->prepare($sql);
+            $stmt = Database::getInstance()->prepare($sql);
             $stmt->execute([
                 ':uid' => $userId,
                 ':dob' => $dob ?: null,
                 ':age' => $ageAtReg,
             ]);
-            return (int) db()->lastInsertId();
+            return (int) Database::getInstance()->lastInsertId();
         } catch (Throwable $e) {
             // Fallback if dob column doesn't exist
             $sql = "INSERT INTO patient (user_id, age_at_registration) VALUES (:uid, :age)";
-            $stmt = db()->prepare($sql);
+            $stmt = Database::getInstance()->prepare($sql);
             $stmt->execute([
                 ':uid' => $userId,
                 ':age' => $ageAtReg,
             ]);
-            return (int) db()->lastInsertId();
+            return (int) Database::getInstance()->lastInsertId();
         }
     }
 
     public static function findById(int $patientId): ?array
     {
-        $stmt = db()->prepare("SELECT * FROM patient WHERE patient_id = :pid AND deleted_at IS NULL LIMIT 1");
+        $stmt = Database::getInstance()->prepare("SELECT * FROM patient WHERE patient_id = :pid AND deleted_at IS NULL LIMIT 1");
         $stmt->execute([':pid' => $patientId]);
         $row = $stmt->fetch();
         return $row ?: null;
@@ -37,7 +37,7 @@ final class Patient
 
     public static function findByUserId(int $userId): ?array
     {
-        $stmt = db()->prepare("SELECT * FROM patient WHERE user_id = :uid AND deleted_at IS NULL LIMIT 1");
+        $stmt = Database::getInstance()->prepare("SELECT * FROM patient WHERE user_id = :uid AND deleted_at IS NULL LIMIT 1");
         $stmt->execute([':uid' => $userId]);
         $row = $stmt->fetch();
         return $row ?: null;
@@ -45,7 +45,7 @@ final class Patient
 
     public static function getPatientIdForUser(int $userId): ?int
     {
-        $stmt = db()->prepare("SELECT patient_id FROM patient WHERE user_id = :uid AND deleted_at IS NULL LIMIT 1");
+        $stmt = Database::getInstance()->prepare("SELECT patient_id FROM patient WHERE user_id = :uid AND deleted_at IS NULL LIMIT 1");
         $stmt->execute([':uid' => $userId]);
         $pid = $stmt->fetchColumn();
         return $pid ? (int) $pid : null;
@@ -62,7 +62,7 @@ final class Patient
                 medical_history = :mh,
                 allergies = :allergies
             WHERE patient_id = :pid AND deleted_at IS NULL";
-        $stmt = db()->prepare($sql);
+        $stmt = Database::getInstance()->prepare($sql);
         return $stmt->execute([
             ':address' => $data['address'] ?? null,
             ':marital_status' => $data['marital_status'] ?? null,

@@ -89,7 +89,7 @@ class RoleLayout
         // Load System Name
         $systemName = 'MatriFlow';
         try {
-            $stmt = db()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'system_name'");
+            $stmt = Database::getInstance()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'system_name'");
             $stmt->execute();
             if ($row = $stmt->fetch()) {
                 $systemName = $row['setting_value'] ?: 'MatriFlow';

@@ -67,7 +67,7 @@ final class AppointmentController
         $dayOfWeek = date('l', strtotime($date));
 
         // 1. Get schedule for the day
-        $stmt = db()->prepare("SELECT start_time, end_time FROM doctor_schedule 
+        $stmt = Database::getInstance()->prepare("SELECT start_time, end_time FROM doctor_schedule
                              WHERE doctor_user_id = :did AND day_of_week = :day AND is_available = 1");
         $stmt->execute([':did' => $doctorId, ':day' => $dayOfWeek]);
         $schedules = $stmt->fetchAll();
@@ -75,7 +75,7 @@ final class AppointmentController
         if (!$schedules) return [];
 
         // 2. Get existing bookings for that day
-        $stmt = db()->prepare("SELECT appointment_date FROM appointment 
+        $stmt = Database::getInstance()->prepare("SELECT appointment_date FROM appointment
                              WHERE doctor_user_id = :did 
                              AND DATE(appointment_date) = :date 
                              AND appointment_status NOT IN ('cancelled', 'no_show')");

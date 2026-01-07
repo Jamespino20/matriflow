@@ -82,7 +82,7 @@ final class PaymentController
                 LEFT JOIN payment p ON b.billing_id = p.billing_id
                 WHERE b.patient_id = :patient_id
                 ORDER BY b.created_at DESC";
-        $stmt = db()->prepare($sql);
+        $stmt = Database::getInstance()->prepare($sql);
         $stmt->execute([':patient_id' => $patientId]);
         return $stmt->fetchAll();
     }

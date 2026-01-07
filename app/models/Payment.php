@@ -17,7 +17,7 @@ final class Payment
       (billing_id, patient_id, amount_paid, paid_at, method, reference_no, recorded_by_user_id, notes)
       VALUES
       (:bid, :pid, :amt, :paid_at, :method, :ref, :by, :notes)";
-        $stmt = db()->prepare($sql);
+        $stmt = Database::getInstance()->prepare($sql);
         $stmt->execute([
             ':bid' => $billingId,
             ':pid' => $patientId,
@@ -28,12 +28,12 @@ final class Payment
             ':by' => $recordedByUserId,
             ':notes' => $notes,
         ]);
-        return (int) db()->lastInsertId();
+        return (int) Database::getInstance()->lastInsertId();
     }
 
     public static function listByPatient(int $patientId, int $limit = 50): array
     {
-        $stmt = db()->prepare("SELECT * FROM payment
+        $stmt = Database::getInstance()->prepare("SELECT * FROM payment
                            WHERE patient_id = :pid
                            ORDER BY paid_at DESC
                            LIMIT " . (int) $limit);

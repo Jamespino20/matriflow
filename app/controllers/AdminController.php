@@ -7,66 +7,66 @@ final class AdminController
     public static function getDashboardStats(): array
     {
         // Total Users
-        $stmt = db()->prepare("SELECT COUNT(*) FROM user");
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM user");
         $stmt->execute();
         $totalUsers = (int) $stmt->fetchColumn();
 
         // Active Sessions (last 15 mins)
-        $stmt = db()->prepare("SELECT COUNT(*) FROM user WHERE last_activity_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)");
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM user WHERE last_activity_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)");
         $stmt->execute();
         $activeSessions = (int) $stmt->fetchColumn();
 
         // Total Revenue
-        $stmt = db()->prepare("SELECT SUM(amount_paid) FROM payment");
+        $stmt = Database::getInstance()->prepare("SELECT SUM(amount_paid) FROM payment");
         $stmt->execute();
         $totalRevenue = (float) $stmt->fetchColumn();
 
         // Pending Appointments List
-        $stmt = db()->prepare("SELECT a.*, u.first_name, u.last_name FROM appointment a JOIN patient p ON a.patient_id = p.patient_id JOIN user u ON p.user_id = u.user_id WHERE a.appointment_status = 'pending' ORDER BY a.appointment_date ASC LIMIT 5");
+        $stmt = Database::getInstance()->prepare("SELECT a.*, u.first_name, u.last_name FROM appointment a JOIN patient p ON a.patient_id = p.patient_id JOIN user u ON p.user_id = u.user_id WHERE a.appointment_status = 'pending' ORDER BY a.appointment_date ASC LIMIT 5");
         $stmt->execute();
         $pendingAppointmentsList = $stmt->fetchAll() ?: [];
         $pendingAppointmentsCount = count($pendingAppointmentsList); // Just a fallback, would be better to have full count
 
         // Full Pending Count
-        $stmt = db()->prepare("SELECT COUNT(*) FROM appointment WHERE appointment_status = 'pending'");
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM appointment WHERE appointment_status = 'pending'");
         $stmt->execute();
         $pendingAppointmentsCount = (int) $stmt->fetchColumn();
 
         // Scheduled Appointments (Today)
         $today = date('Y-m-d');
-        $stmt = db()->prepare("SELECT COUNT(*) FROM appointment WHERE appointment_status = 'scheduled' AND DATE(appointment_date) = :today");
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM appointment WHERE appointment_status = 'scheduled' AND DATE(appointment_date) = :today");
         $stmt->execute([':today' => $today]);
         $scheduledToday = (int) $stmt->fetchColumn();
 
         // Cancelled Appointments (This Month)
-        $stmt = db()->prepare("SELECT COUNT(*) FROM appointment WHERE appointment_status = 'cancelled' AND MONTH(appointment_date) = MONTH(NOW())");
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM appointment WHERE appointment_status = 'cancelled' AND MONTH(appointment_date) = MONTH(NOW())");
         $stmt->execute();
         $cancelledThisMonth = (int) $stmt->fetchColumn();
 
         // Completed Appointments (This Month)
-        $stmt = db()->prepare("SELECT COUNT(*) FROM appointment WHERE appointment_status = 'completed' AND MONTH(appointment_date) = MONTH(NOW())");
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM appointment WHERE appointment_status = 'completed' AND MONTH(appointment_date) = MONTH(NOW())");
         $stmt->execute();
         $completedThisMonth = (int) $stmt->fetchColumn();
 
         // Active Patients
-        $stmt = db()->prepare("SELECT COUNT(*) FROM patient p JOIN user u ON p.user_id = u.user_id WHERE u.is_active = 1");
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM patient p JOIN user u ON p.user_id = u.user_id WHERE u.is_active = 1");
         $stmt->execute();
         $activePatients = (int) $stmt->fetchColumn();
 
         // Recent Audit Logs
-        $stmt = db()->prepare("SELECT * FROM audit_log ORDER BY logged_at DESC LIMIT 5");
+        $stmt = Database::getInstance()->prepare("SELECT * FROM audit_log ORDER BY logged_at DESC LIMIT 5");
         $stmt->execute();
         $recentLogs = $stmt->fetchAll() ?: [];
 
         // Lab Growth (for charts)
-        $stmt = db()->prepare("SELECT DATE(ordered_at) as date, COUNT(*) as count FROM laboratory_test GROUP BY DATE(ordered_at) ORDER BY date DESC LIMIT 7");
+        $stmt = Database::getInstance()->prepare("SELECT DATE(ordered_at) as date, COUNT(*) as count FROM laboratory_test GROUP BY DATE(ordered_at) ORDER BY date DESC LIMIT 7");
         $stmt->execute();
         $labGrowth = $stmt->fetchAll() ?: [];
 
         // System Health Check
         $dbHealth = true;
         try {
-            db()->query("SELECT 1");
+            Database::getInstance()->query("SELECT 1");
         } catch (Throwable $e) {
             $dbHealth = false;
         }

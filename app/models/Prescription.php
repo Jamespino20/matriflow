@@ -6,7 +6,7 @@ final class Prescription
 {
     public static function create(int $patientId, int $doctorId, array $data): int
     {
-        $stmt = db()->prepare("INSERT INTO prescription 
+        $stmt = Database::getInstance()->prepare("INSERT INTO prescription
             (patient_id, doctor_user_id, consultation_id, medication_name, dosage, frequency, duration, instructions, prescribed_at)
             VALUES (:pid, :did, :cid, :m, :dos, :f, :dur, :i, NOW())");
 
@@ -21,12 +21,12 @@ final class Prescription
             ':i' => $data['instructions'] ?? null
         ]);
 
-        return (int) db()->lastInsertId();
+        return (int) Database::getInstance()->lastInsertId();
     }
 
     public static function listByPatient(int $patientId): array
     {
-        $stmt = db()->prepare("SELECT p.*, u.first_name as doctor_first, u.last_name as doctor_last 
+        $stmt = Database::getInstance()->prepare("SELECT p.*, u.first_name as doctor_first, u.last_name as doctor_last
                              FROM prescription p 
                              JOIN user u ON p.doctor_user_id = u.user_id 
                              WHERE p.patient_id = ? 

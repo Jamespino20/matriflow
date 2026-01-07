@@ -5,7 +5,7 @@ final class LaboratoryTest
 {
     public static function countNewForPatient(int $patientId): int
     {
-        $stmt = db()->prepare("SELECT COUNT(*) FROM laboratory_test 
+        $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM laboratory_test
                                WHERE patient_id = :pid 
                                AND released_to_patient = 1 
                                AND viewed_by_patient = 0");
@@ -15,7 +15,7 @@ final class LaboratoryTest
 
     public static function listRecent(int $patientId, int $limit = 5): array
     {
-        $stmt = db()->prepare("SELECT * FROM laboratory_test 
+        $stmt = Database::getInstance()->prepare("SELECT * FROM laboratory_test
                                WHERE patient_id = :pid 
                                AND released_to_patient = 1 
                                ORDER BY released_at DESC 

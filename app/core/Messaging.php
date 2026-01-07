@@ -12,7 +12,7 @@ class Messaging
     public static function sendAlert(int $userId, string $title, string $message, string $type = 'info', ?string $actionUrl = null): bool
     {
         try {
-            $stmt = db()->prepare('
+            $stmt = Database::getInstance()->prepare('
                 INSERT INTO notifications (user_id, title, message, type, action_url, is_read, created_at)
                 VALUES (:user_id, :title, :message, :type, :action_url, 0, NOW())
             ');
@@ -39,7 +39,7 @@ class Messaging
             // For now, log the SMS
             error_log("SMS to {$phoneNumber}: {$message}");
 
-            $stmt = db()->prepare('
+            $stmt = Database::getInstance()->prepare('
                 INSERT INTO sms_logs (user_id, phone_number, message, status, sent_at)
                 VALUES (:user_id, :phone_number, :message, "pending", NOW())
             ');
@@ -60,7 +60,7 @@ class Messaging
     public static function getUnreadNotifications(int $userId, int $limit = 5): array
     {
         try {
-            $stmt = db()->prepare('
+            $stmt = Database::getInstance()->prepare('
                 SELECT * FROM notifications
                 WHERE user_id = :user_id AND is_read = 0
                 ORDER BY created_at DESC
@@ -82,7 +82,7 @@ class Messaging
     public static function markAsRead(int $notificationId): bool
     {
         try {
-            $stmt = db()->prepare('UPDATE notifications SET is_read = 1, read_at = NOW() WHERE id = :id');
+            $stmt = Database::getInstance()->prepare('UPDATE notifications SET is_read = 1, read_at = NOW() WHERE id = :id');
             return $stmt->execute([':id' => $notificationId]);
         } catch (Throwable $e) {
             error_log('Messaging::markAsRead failed: ' . $e->getMessage());
@@ -106,7 +106,7 @@ class Messaging
                 return false;
             }
 
-            $stmt = db()->prepare('
+            $stmt = Database::getInstance()->prepare('
                 INSERT INTO sms_reminders (user_id, phone_number, message, scheduled_for, status)
                 VALUES (:user_id, :phone_number, :message, :scheduled_for, "pending")
             ');

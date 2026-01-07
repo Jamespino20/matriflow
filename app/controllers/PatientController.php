@@ -34,7 +34,7 @@ final class PatientController
         // Lab results
         $newLabsCount = 0;
         try {
-            $stmt = db()->prepare("SELECT COUNT(*) FROM laboratory_test WHERE patient_id = :pid AND status = 'completed' AND viewed_at IS NULL");
+            $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM laboratory_test WHERE patient_id = :pid AND status = 'completed' AND viewed_at IS NULL");
             $stmt->execute([':pid' => $pid]);
             $newLabsCount = (int)$stmt->fetchColumn();
         } catch (Throwable $e) {
@@ -44,7 +44,7 @@ final class PatientController
         // Unread Messages
         $unreadMsgCount = 0;
         try {
-            $stmt = db()->prepare("SELECT COUNT(*) FROM messages WHERE receiver_id = :uid AND is_read = 0");
+            $stmt = Database::getInstance()->prepare("SELECT COUNT(*) FROM messages WHERE receiver_id = :uid AND is_read = 0");
             $stmt->execute([':uid' => $userId]);
             $unreadMsgCount = (int)$stmt->fetchColumn();
         } catch (Throwable $e) {
@@ -54,7 +54,7 @@ final class PatientController
         // Weight History (for charts)
         $weightHistory = [];
         try {
-            $stmt = db()->prepare("SELECT weight_kg, recorded_at FROM vital_signs WHERE patient_id = :pid ORDER BY recorded_at DESC LIMIT 10");
+            $stmt = Database::getInstance()->prepare("SELECT weight_kg, recorded_at FROM vital_signs WHERE patient_id = :pid ORDER BY recorded_at DESC LIMIT 10");
             $stmt->execute([':pid' => $pid]);
             $weightHistory = array_reverse($stmt->fetchAll());
         } catch (Throwable $e) {
@@ -64,7 +64,7 @@ final class PatientController
         // Prenatal Progress
         $baseline = null;
         try {
-            $stmt = db()->prepare("SELECT * FROM prenatal_baseline WHERE patient_id = :pid ORDER BY created_at DESC LIMIT 1");
+            $stmt = Database::getInstance()->prepare("SELECT * FROM prenatal_baseline WHERE patient_id = :pid ORDER BY created_at DESC LIMIT 1");
             $stmt->execute([':pid' => $pid]);
             $baseline = $stmt->fetch();
         } catch (Throwable $e) {
@@ -112,7 +112,7 @@ final class PatientController
         }
 
         $sql .= " ORDER BY u.last_name ASC, u.first_name ASC";
-        $stmt = db()->prepare($sql);
+        $stmt = Database::getInstance()->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
     }

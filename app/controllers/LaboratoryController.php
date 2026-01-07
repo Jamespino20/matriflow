@@ -26,14 +26,14 @@ final class LaboratoryController
         }
 
         $sql .= " ORDER BY lt.ordered_at DESC";
-        $stmt = db()->prepare($sql);
+        $stmt = Database::getInstance()->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
     public static function updateResult(int $testId, string $result, string $status, int $released): bool
     {
-        $stmt = db()->prepare("UPDATE laboratory_test 
+        $stmt = Database::getInstance()->prepare("UPDATE laboratory_test
                                SET test_result = :res, status = :status, 
                                    released_to_patient = :rel, released_at = IF(:rel = 1, NOW(), released_at)
                                WHERE test_id = :id");
@@ -47,7 +47,7 @@ final class LaboratoryController
 
     public static function listByPatient(int $patientId): array
     {
-        $stmt = db()->prepare("SELECT * FROM laboratory_test WHERE patient_id = :pid ORDER BY ordered_at DESC");
+        $stmt = Database::getInstance()->prepare("SELECT * FROM laboratory_test WHERE patient_id = :pid ORDER BY ordered_at DESC");
         $stmt->execute([':pid' => $patientId]);
         return $stmt->fetchAll();
     }

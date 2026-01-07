@@ -28,19 +28,16 @@ final class Auth
         $_SESSION['_last_seen'] = time();
 
         // DB session tracking
-        try {
-            $sql = "INSERT INTO user_sessions (session_id, user_id, ip_address, user_agent, expires_at)
-              VALUES (:sid, :uid, :ip, :ua, :exp)";
-            $stmt = db()->prepare($sql);
-            $stmt->execute([
-                ':sid' => session_id(),
-                ':uid' => (int) $userRow['user_id'],
-                ':ip' => client_ip(),
-                ':ua' => user_agent(),
-                ':exp' => date('Y-m-d H:i:s', time() + SESSION_ABSOLUTE_SECONDS),
-            ]);
-        } catch (Throwable $e) {
-        }
+        $sql = "INSERT INTO user_sessions (session_id, user_id, ip_address, user_agent, expires_at)
+            VALUES (:sid, :uid, :ip, :ua, :exp)";
+        $stmt = Database::getInstance()->prepare($sql);
+        $stmt->execute([
+            ':sid' => session_id(),
+            ':uid' => (int) $userRow['user_id'],
+            ':ip' => client_ip(),
+            ':ua' => user_agent(),
+            ':exp' => date('Y-m-d H:i:s', time() + SESSION_ABSOLUTE_SECONDS),
+        ]);
     }
 
     public static function logout(): void
@@ -48,11 +45,8 @@ final class Auth
         $uid = self::check() ? (int) $_SESSION['user_id'] : null;
 
         if ($uid) {
-            try {
-                $stmt = db()->prepare("DELETE FROM user_sessions WHERE session_id = :sid");
-                $stmt->execute([':sid' => session_id()]);
-            } catch (Throwable $e) {
-            }
+            $stmt = Database::getInstance()->prepare("DELETE FROM user_sessions WHERE session_id = :sid");
+            $stmt->execute([':sid' => session_id()]);
             AuditLogger::log($uid, null, 'LOGOUT', null, null);
         }
 
@@ -74,11 +68,8 @@ final class Auth
     {
         $_SESSION['two_factor_ok'] = 1;
         $uid = (int) $_SESSION['user_id'];
-        try {
-            $stmt = db()->prepare("UPDATE user SET two_factor_verified_at = NOW() WHERE user_id = :uid");
-            $stmt->execute([':uid' => $uid]);
-        } catch (Throwable $e) {
-        }
+        $stmt = Database::getInstance()->prepare("UPDATE user SET two_factor_verified_at = NOW() WHERE user_id = :uid");
+        $stmt->execute([':uid' => $uid]);
     }
 
     public static function requires2FA(array $userRow): bool
@@ -133,10 +124,7 @@ final class Auth
         if (!self::check())
             return;
         $uid = (int) $_SESSION['user_id'];
-        try {
-            $stmt = db()->prepare("UPDATE user SET last_activity_at = NOW() WHERE user_id = :uid");
-            $stmt->execute([':uid' => $uid]);
-        } catch (Throwable $e) {
-        }
+        $stmt = Database::getInstance()->prepare("UPDATE user SET last_activity_at = NOW() WHERE user_id = :uid");
+        $stmt->execute([':uid' => $uid]);
     }
 }

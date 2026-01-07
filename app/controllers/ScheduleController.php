@@ -9,7 +9,7 @@ final class ScheduleController
      */
     public static function getDoctorSchedule(int $doctorId): array
     {
-        $stmt = db()->prepare("SELECT * FROM doctor_schedule WHERE doctor_user_id = :did ORDER BY FIELD(day_of_week, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'), start_time ASC");
+        $stmt = Database::getInstance()->prepare("SELECT * FROM doctor_schedule WHERE doctor_user_id = :did ORDER BY FIELD(day_of_week, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'), start_time ASC");
         $stmt->execute([':did' => $doctorId]);
         return $stmt->fetchAll();
     }
@@ -19,7 +19,7 @@ final class ScheduleController
      */
     public static function updateSchedule(int $doctorId, array $schedule): bool
     {
-        $db = db();
+        $db = Database::getInstance();
         try {
             $db->beginTransaction();
 
@@ -53,7 +53,7 @@ final class ScheduleController
      */
     public static function getAllSchedules(): array
     {
-        $stmt = db()->prepare("
+        $stmt = Database::getInstance()->prepare("
             SELECT s.*, u.first_name, u.last_name 
             FROM doctor_schedule s
             JOIN user u ON s.doctor_user_id = u.user_id

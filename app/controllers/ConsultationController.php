@@ -22,7 +22,7 @@ final class ConsultationController
 
     public static function getActivePregnancy(int $patientId): ?array
     {
-        $stmt = db()->prepare("SELECT * FROM pregnancy_history WHERE patient_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1");
+        $stmt = Database::getInstance()->prepare("SELECT * FROM pregnancy_history WHERE patient_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1");
         $stmt->execute([$patientId]);
         $preg = $stmt->fetch();
 
