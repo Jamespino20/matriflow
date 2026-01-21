@@ -4,7 +4,9 @@ require_once __DIR__ . '/bootstrap.php';
 // If user is already authenticated, redirect to their role-specific dashboard
 if (Auth::check()) {
     $u = Auth::user();
-    if ($u) {
+    // Only redirect if 2FA is NOT required or already verified this session
+    // This ensures unverified users (even patients) stay on the homepage
+    if ($u && Auth::is2FAVerifiedThisSession()) {
         $role = $u['role'] ?? 'patient';
         $dashboardPaths = [
             'admin'     => '/public/admin/dashboard.php',
@@ -21,216 +23,31 @@ if (Auth::check()) {
 $pageTitle = 'Home - MatriFlow';
 $currentPage = 'home';
 
-// Handle Forgot Password & Reset Password POST requests
+// Handle Flash Messages
 $forgotResultMessage = null;
 $resetLink = null;
 $resetResultMessage = null;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-
-    // Forgot Password Handler
-    if ($action === 'forgotpassword') {
-        $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
-
-        if (!CSRF::validate($_POST['csrf_token'] ?? null)) {
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => false, 'message' => 'Invalid request (CSRF).']);
-                exit;
-            }
-            $_SESSION['flash_forgot_msg'] = 'Invalid request (CSRF).';
-            redirect('/');
-        }
-
-        $identity = trim((string) ($_POST['identity'] ?? ''));
-        if ($identity === '') {
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => false, 'message' => 'Enter your username or email.']);
-                exit;
-            }
-            $_SESSION['flash_forgot_msg'] = 'Enter your username or email.';
-            redirect('/');
-        }
-
-        try {
-            $user = User::findByIdentity($identity);
-        } catch (Throwable $e) {
-            error_log('User::findByIdentity() error: ' . $e->getMessage());
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => false, 'message' => 'Database error.']);
-                exit;
-            }
-            $_SESSION['flash_forgot_msg'] = 'Database error.';
-            redirect('/');
-        }
-
-        // Don't leak account existence
-        if (!$user) {
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => true, 'message' => 'If the account exists, a reset link will be provided.']);
-                exit;
-            }
-            $_SESSION['flash_forgot_msg'] = 'If the account exists, a reset link will be provided.';
-            redirect('/?forgot=1');
-        }
-
-        $token = bin2hex(random_bytes(32));
-        $tokenHash = hash('sha256', $token);
-        $expiresAt = date('Y-m-d H:i:s', time() + (15 * 60));
-
-        try {
-            $stmt = db()->prepare("INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (:uid, :hash, :exp)");
-            $stmt->execute([':uid' => (int) $user['user_id'], ':hash' => $tokenHash, ':exp' => $expiresAt]);
-
-            $modalLink = base_url('/?action=reset&token=' . $token);
-
-            AuditLogger::log((int) $user['user_id'], 'password_reset_tokens', 'INSERT', null, 'password_reset_requested');
-
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => true, 'message' => 'Reset link generated:', 'reset_link' => $modalLink]);
-                exit;
-            }
-
-            $_SESSION['flash_forgot_msg'] = 'Reset link generated (copy/paste):';
-            $_SESSION['flash_reset_link'] = $modalLink;
-            redirect('/?forgot=1');
-        } catch (Throwable $e) {
-            error_log('Forgot password error: ' . $e->getMessage());
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => false, 'message' => 'An error occurred.']);
-                exit;
-            }
-            $_SESSION['flash_forgot_msg'] = 'An error occurred.';
-            redirect('/');
-        }
-    }
-
-    // Reset Password Handler
-    if ($action === 'resetpassword') {
-        $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
-
-        if (!CSRF::validate($_POST['csrf_token'] ?? null)) {
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => false, 'message' => 'Invalid request (CSRF).']);
-                exit;
-            }
-            $_SESSION['flash_reset_msg'] = 'Invalid request (CSRF).';
-            redirect('/');
-        }
-
-        $token = trim((string) ($_POST['token'] ?? ''));
-        $pass1 = (string) ($_POST['password'] ?? '');
-        $pass2 = (string) ($_POST['passwordconfirm'] ?? '');
-
-        if ($token === '' || $pass1 === '' || $pass2 === '') {
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => false, 'message' => 'All fields required.']);
-                exit;
-            }
-            $_SESSION['flash_reset_msg'] = 'All fields required.';
-            redirect('/?action=reset&token=' . urlencode($token));
-        }
-
-        if (strlen($pass1) < 8) {
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => false, 'message' => 'Password must be at least 8 characters.']);
-                exit;
-            }
-            $_SESSION['flash_reset_msg'] = 'Password must be at least 8 characters.';
-            redirect('/?action=reset&token=' . urlencode($token));
-        }
-
-        if (!hash_equals($pass1, $pass2)) {
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => false, 'message' => 'Passwords do not match.']);
-                exit;
-            }
-            $_SESSION['flash_reset_msg'] = 'Passwords do not match.';
-            redirect('/?action=reset&token=' . urlencode($token));
-        }
-
-        $tokenHash = hash('sha256', $token);
-
-        try {
-            $stmt = db()->prepare("SELECT * FROM password_reset_tokens WHERE token_hash = :hash AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1");
-            $stmt->execute([':hash' => $tokenHash]);
-            $row = $stmt->fetch();
-
-            if (!$row) {
-                if ($isAjax) {
-                    header('Content-Type: application/json');
-                    echo json_encode(['ok' => false, 'message' => 'Token is invalid or expired.']);
-                    exit;
-                }
-                $_SESSION['flash_reset_msg'] = 'Token is invalid or expired.';
-                redirect('/');
-            }
-
-            $uid = (int) $row['user_id'];
-            $newHash = password_hash($pass1, PASSWORD_DEFAULT);
-
-            db()->beginTransaction();
-
-            $stmt1 = db()->prepare("UPDATE user SET password_hash = :ph WHERE user_id = :uid");
-            $stmt1->execute([':ph' => $newHash, ':uid' => $uid]);
-
-            $stmt2 = db()->prepare("DELETE FROM password_reset_tokens WHERE password_reset_token_id = :id");
-            $stmt2->execute([':id' => (int) $row['password_reset_token_id']]);
-
-            $stmt3 = db()->prepare("DELETE FROM user_sessions WHERE user_id = :uid");
-            $stmt3->execute([':uid' => $uid]);
-
-            db()->commit();
-
-            AuditLogger::log($uid, 'user', 'UPDATE', $uid, 'password_reset_success');
-
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => true, 'message' => 'Password updated. Please log in again.']);
-                exit;
-            }
-
-            $_SESSION['flash_reset_msg'] = 'Password updated. Please log in again.';
-            redirect('/?password_reset=1');
-        } catch (Throwable $e) {
-            if (db()->inTransaction()) {
-                db()->rollBack();
-            }
-            error_log('Reset password error: ' . $e->getMessage());
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => false, 'message' => 'Password reset failed.']);
-                exit;
-            }
-            $_SESSION['flash_reset_msg'] = 'Password reset failed.';
-            redirect('/?action=reset&token=' . urlencode($token));
-        }
-    }
-}
-
-// Pull flash messages
 if (isset($_SESSION['flash_forgot_msg'])) {
     $forgotResultMessage = $_SESSION['flash_forgot_msg'];
     unset($_SESSION['flash_forgot_msg']);
-}
-if (isset($_SESSION['flash_reset_link'])) {
-    $resetLink = $_SESSION['flash_reset_link'];
-    unset($_SESSION['flash_reset_link']);
 }
 if (isset($_SESSION['flash_reset_msg'])) {
     $resetResultMessage = $_SESSION['flash_reset_msg'];
     unset($_SESSION['flash_reset_msg']);
 }
+if (isset($_SESSION['flash_forgot_errors'])) {
+    // Maybe show errors in modal? For now just simple message mechanism
+    // In a real app we'd pass array to JS or display alert
+    $forgotResultMessage = implode('<br>', $_SESSION['flash_forgot_errors']);
+    unset($_SESSION['flash_forgot_errors']);
+}
+
+$showForgotModal = isset($_GET['forgot']) && $_GET['forgot'] == '1';
+if (isset($forgotResultMessage) && $forgotResultMessage) {
+    $showForgotModal = true;
+}
+
 ?>
 
 <!doctype html>
@@ -239,10 +56,20 @@ if (isset($_SESSION['flash_reset_msg'])) {
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="title" content="MatriFlow - Commonwealth Hospital">
+    <meta name="description" content="MatriFlow is the digital bridge to Commonwealth Hospital’s specialized maternity team. We’ve streamlined your checkups so you can spend less time in the waiting room and more time with your doctor.">
+    <meta name="keywords" content="maternity,information system,maternity clinic,commonwealth hospital and medical center,chmc,information technology,system">
+    <meta name="robots" content="index, follow">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="revisit-after" content="7 days">
+    <meta name="description" content="English">
+    <meta name="author" content="James Bryant Espino">
     <title>MatriFlow - Commonwealth Hospital</title>
     <link rel="icon" type="image/ico" href="<?= base_url('/public/assets/images/favicon.ico') ?>" />
     <link rel="stylesheet" href="<?= base_url('/public/assets/css/app.css') ?>">
     <link rel="stylesheet" href="<?= base_url('/public/assets/css/home.css') ?>">
+
+
 </head>
 
 <body class="home">
@@ -274,7 +101,7 @@ if (isset($_SESSION['flash_reset_msg'])) {
         <div class="container">
             <div class="hero-grid">
                 <div>
-                    <div class="pill"><span class="dot"></span> Powered by Commonwealth Hospital</div>
+                    <div class="pill"><span c lass="dot"></span> Powered by Commonwealth Hospital</div>
                     <h1>Your Pregnancy, Managed. <br><span class="primary">Your Medical Co-Pilot.</span></h1>
                     <p>
                         MatriFlow is the digital bridge to Commonwealth Hospital’s specialized maternity team. We’ve streamlined your checkups so you can spend less time in the waiting room and more time with your doctor.
@@ -290,7 +117,7 @@ if (isset($_SESSION['flash_reset_msg'])) {
 
         <!-- Big CHMC logo overlay (your preferred style) -->
         <div class="hero-logo">
-            <img src="<?= base_url('/public/assets/images/CHMC-logo.jpg') ?>" alt="Commonwealth Hospital and Medical Center">
+            <img src="<?= base_url('/public/assets/images/CHMC-logo.png') ?>" alt="Commonwealth Hospital and Medical Center">
         </div>
     </section>
 
@@ -398,13 +225,13 @@ if (isset($_SESSION['flash_reset_msg'])) {
             <div class="t-head">
                 <div class="kicker">Functional Social Proof</div>
                 <div class="title">Healthcare that Works</div>
-                <p class="sub">Authentic experiences from families navigating their journey with MatriFlow.</p>
+                <p class="sub">Authentic experiences from people navigating their journey with MatriFlow.</p>
             </div>
 
             <div class="t-grid">
                 <div class="t-card">
                     <div class="t-stars">★★★★★</div>
-                    <div class="t-quote">“Being able to see my newborn's screening results on my phone at 2 AM saved me so much anxiety. No more waiting for callbacks.”</div>
+                    <div class="t-quote">“I was terrified of the paperwork and the hidden costs of giving birth. The Delivery Package on MatriFlow laid everything out clearly—no surprise 'add-ons' when we were discharged from CHMC. Being able to see my lab results on my phone while my baby slept was the peace of mind I actually needed.”</div>
                     <div class="t-user">
                         <img class="t-avatar" src="<?= base_url('/public/assets/images/testimonial-1.jpg') ?>" alt="">
                         <div>
@@ -416,7 +243,7 @@ if (isset($_SESSION['flash_reset_msg'])) {
 
                 <div class="t-card">
                     <div class="t-stars">★★★★★</div>
-                    <div class="t-quote">“Booking my prenatal checkups while in the office takes less than a minute. The system actually syncs with the doctor's real schedule.”</div>
+                    <div class="t-quote">“Most hospital portals feel like they were built in the 90s, but this actually works. I booked my OB-GYN appointment while stuck in traffic on Regalado Highway and got a confirmation before I even reached the Neopolitan Business Park. It’s the first time the 'system' felt like it was on my side.”</div>
                     <div class="t-user">
                         <img class="t-avatar" src="<?= base_url('/public/assets/images/testimonial-2.jpg') ?>" alt="">
                         <div>
@@ -428,11 +255,11 @@ if (isset($_SESSION['flash_reset_msg'])) {
 
                 <div class="t-card">
                     <div class="t-stars">★★★★★</div>
-                    <div class="t-quote">“MatriFlow has aided me and my team in managing our clinic's operations with ease. The system is user-friendly and efficient.”</div>
+                    <div class="t-quote">“Our goal at the Commonwealth Hospital maternity wing is to remove the friction between the doctor and the patient. MatriFlow allows our staff to focus on clinical care rather than answering 'Where is my lab result?' phone calls. When a patient registers here, they are getting the full weight of the Metro Pacific Health network with the speed of a modern app. It really is Sulit for both our team and our families.”</div>
                     <div class="t-user">
                         <img class="t-avatar" src="<?= base_url('/public/assets/images/testimonial-3.jpg') ?>" alt="">
                         <div>
-                            <div class="t-name">Mark Reyes</div>
+                            <div class="t-name">Elena Rivera</div>
                             <div class="t-role">Clinic Manager</div>
                         </div>
                     </div>
@@ -450,7 +277,7 @@ if (isset($_SESSION['flash_reset_msg'])) {
                     <p>MatriFlow is the digital heartbeat of your maternity care, powered by Commonwealth Hospital and Medical Center (CHMC).</p>
                     <br>
                     <p>As the 19th hospital in the <strong>Metro Pacific Health</strong> network—the Philippines' largest healthcare group—we bring nationwide expertise directly to Novaliches. MatriFlow ensures this premium care is always reachable.</p>
-                    <p style="font-weight: 900; margin-top: 15px;">Malapit. Maraming Gamit. Sulit.</p>
+                    <p style="font-weight: 900; margin-top: 15px;">WE CARE FOR YOU<br>Malapit. Maraming Gamit. Sulit.</p>
                 </div>
             </div>
 
@@ -657,12 +484,19 @@ if (isset($_SESSION['flash_reset_msg'])) {
                         <input type="hidden" name="action" value="register">
                         <?php echo CSRF::input(); ?>
 
-                        <div class="form-grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                        <div class="form-grid-3" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
                             <div class="form-row">
                                 <label class="label">First Name</label>
                                 <div class="input-group">
                                     <span class="icon" style="position:absolute; left:12px; z-index:1; opacity:0.5;">👤</span>
                                     <input class="input" type="text" name="first_name" placeholder="Jane" style="padding-left:36px" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <label class="label">Middle Name</label>
+                                <div class="input-group">
+                                    <span class="icon" style="position:absolute; left:12px; z-index:1; opacity:0.5;">👤</span>
+                                    <input class="input" type="text" name="middle_name" placeholder="Ann" style="padding-left:36px">
                                 </div>
                             </div>
                             <div class="form-row">
@@ -787,13 +621,13 @@ if (isset($_SESSION['flash_reset_msg'])) {
                 <h2>Forgot Password?</h2>
                 <p>No worries! Enter your email address below and we'll send you a link to reset your password.</p>
 
-                <form method="post" action="<?= base_url('/') ?>" style="text-align:left">
+                <form method="post" action="<?= base_url('/public/controllers/auth-handler.php') ?>" style="text-align:left">
                     <?php echo CSRF::input(); ?>
-                    <input type="hidden" name="action" value="forgotpassword">
+                    <input type="hidden" name="action" value="forgot_password">
 
                     <div class="form-row">
                         <label class="label">Email Address</label>
-                        <input class="input" name="identity" type="text" placeholder="name@example.com" required>
+                        <input class="input" name="email" type="text" placeholder="name@example.com" required>
                     </div>
 
                     <button class="btn btn-primary" style="width:100%;height:52px; font-size:16px" type="submit">
@@ -875,6 +709,80 @@ if (isset($_SESSION['flash_reset_msg'])) {
         </div>
     </div>
 
+    <!-- Registration Success Modal -->
+    <div class="modal-overlay modal-clean-center" id="modal-registered-success" aria-hidden="true">
+        <div class="modal-card" style="max-width:450px; text-align:center; padding:40px; border-radius:16px;">
+            <div style="width:80px; height:80px; background:rgba(34, 197, 94, 0.1); color:#16a34a; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 24px;">
+                <span style="font-size:40px;">✉️</span>
+            </div>
+            <h2 style="margin-bottom:16px;">Sign-in Successful!</h2>
+            <p style="color:var(--text-secondary); line-height:1.6; margin-bottom:24px;">
+                Welcome to MatriFlow! To ensure the security of your medical data, we require Two-Factor Authentication (2FA).
+            </p>
+            <div style="background:var(--bg-light); border-radius:12px; padding:20px; margin-bottom:24px; text-align:left;">
+                <p style="font-size:14px; font-weight:600; margin-bottom:8px; color:var(--text-primary);">What happens next?</p>
+                <ul style="font-size:13px; color:var(--text-secondary); padding-left:20px; margin:0;">
+                    <li>Check your email inbox for a setup link.</li>
+                    <li>Follow the link to setup Google Authenticator or Authy.</li>
+                    <li>Once setup, you can log in to your dashboard.</li>
+                </ul>
+            </div>
+
+            <div id="resend-2fa-status" style="margin-bottom: 20px; display: none;"></div>
+
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <button type="button" class="btn btn-primary" style="width:100%;" data-modal-close>Got it, I'll check my email</button>
+                <button type="button" class="btn btn-outline" style="width:100%; font-size: 13px; padding: 10px;" id="btn-resend-2fa" onclick="resend2FAEmail()">
+                    Didn't get the email? Resend Setup Link
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function resend2FAEmail() {
+            const btn = document.getElementById('btn-resend-2fa');
+            const statusDiv = document.getElementById('resend-2fa-status');
+            const originalText = btn.textContent;
+
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                const fd = new FormData();
+                fd.append('action', 'resend_2fa_setup');
+                fd.append('csrf_token', '<?= CSRF::token() ?>');
+
+                const res = await fetch('<?= base_url('/public/controllers/auth-handler.php') ?>', {
+                    method: 'POST',
+                    body: fd,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                const data = await res.json();
+
+                statusDiv.style.display = 'block';
+                if (data.success) {
+                    statusDiv.innerHTML = '<div class="alert alert-success" style="padding:10px; font-size:12px; margin:0;">' + data.message + '</div>';
+                    btn.textContent = 'Email Sent!';
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                    }, 5000);
+                } else {
+                    statusDiv.innerHTML = '<div class="alert alert-danger" style="padding:10px; font-size:12px; margin:0;">' + (data.errors ? data.errors.join(' ') : 'Failed to resend.') + '</div>';
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            } catch (e) {
+                btn.disabled = false;
+                btn.textContent = originalText;
+                alert('Network error.');
+            }
+        }
+    </script>
+
     <script src="<?= base_url('/public/assets/js/app.js') ?>"></script>
     <script src="<?= base_url('/public/assets/js/auth.js') ?>"></script>
     <script>
@@ -924,6 +832,28 @@ if (isset($_SESSION['flash_reset_msg'])) {
             const type = document.getElementById('reg_type').value;
             if (type === 'Patient' && this.value === 'Male') {
                 alert('Maternity clinic patients are typically female. Please verify if you are registering as a Guardian instead.');
+            }
+        });
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('registered') === 'true' && !params.get('setup2fa')) {
+                const modal = document.getElementById('modal-registered-success');
+                if (modal) {
+                    modal.classList.add('show');
+                    document.documentElement.style.overflow = 'hidden';
+                }
+            }
+            if (params.get('forgot') === '1') {
+                const loginModal = document.getElementById('modal-login');
+                if (loginModal) {
+                    loginModal.classList.add('show');
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-success';
+                    alert.style.marginBottom = '20px';
+                    alert.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:8px;">check_circle</span> If an account exists, a reset link has been sent.';
+                    const form = loginModal.querySelector('form');
+                    if (form) form.prepend(alert);
+                }
             }
         });
     </script>
